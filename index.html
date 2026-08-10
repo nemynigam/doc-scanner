@@ -50,24 +50,19 @@
       text-align: center;
     }
     
-    /* Full Camera Viewfinder Box (No Fixed Frame) */
-    .full-camera-container {
-      position: relative;
+    /* Native Camera Trigger Card Box */
+    .cam-trigger-box {
       width: 100%;
-      height: 320px;
-      margin: 0 auto 15px auto;
-      overflow: hidden;
+      min-height: 220px;
+      border: 3px dashed #4e54c8;
       border-radius: 12px;
-      background: #000;
+      background: #f8f9fa;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-    }
-
-    video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+      padding: 20px;
+      margin-bottom: 15px;
     }
 
     /* Cropper Container */
@@ -109,7 +104,7 @@
     <!-- Header -->
     <div class="app-header">
       <h5 class="m-0 fw-bold"><span class="material-icons align-middle me-1">assignment_ind</span> Doc Scanner Pro</h5>
-      <small class="opacity-75">Full Screen Camera + Precision Cropper</small>
+      <small class="opacity-75">Native Camera + Auto Merge (&lt; 29 KB)</small>
     </div>
 
     <div class="p-3 p-sm-4">
@@ -127,26 +122,26 @@
 
       <!-- Stepper Status Badge -->
       <div class="text-center mb-3">
-        <span id="stepBadge" class="badge bg-primary px-3 py-2 fs-6 rounded-pill">Step 1: Click Passport Photo</span>
+        <span id="stepBadge" class="badge bg-primary px-3 py-2 fs-6 rounded-pill">Step 1: Passport Photo</span>
       </div>
 
-      <!-- 1. Full Screen Live Camera Viewfinder Section -->
-      <div id="camSection" class="text-center">
-        <div class="full-camera-container">
-          <video id="video" autoplay playsinline muted></video>
-        </div>
+      <!-- Hidden Native Camera File Input -->
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
 
-        <p class="text-muted small fw-bold mb-3" id="camGuideText">
-          Photo click karein, uske baad Crop box aayega.
-        </p>
+      <!-- 1. Native Camera Trigger Section -->
+      <div id="camSection" class="text-center">
+        <div class="cam-trigger-box">
+          <span class="material-icons text-primary" id="camIconDisplay" style="font-size: 64px;">photo_camera</span>
+          <p class="text-muted small fw-bold mt-2 mb-0" id="camGuideText">
+            Passport Photo khichne ke liye niche button par click karein.
+          </p>
+        </div>
 
         <div class="d-grid gap-2">
           <button id="captureBtn" class="btn btn-primary btn-lg btn-material py-2 fs-6">
-            <span class="material-icons">photo_camera</span> Capture Photo
+            <span class="material-icons">photo_camera</span> Open Full Camera
           </button>
         </div>
-        
-        <div id="cameraErrorBox"></div>
       </div>
 
       <!-- 2. Interactive Cropping UI Section -->
@@ -204,7 +199,7 @@
   let photoDataCanvas = null;
   let signDataCanvas = null;
 
-  const video = document.getElementById('video');
+  const cameraInput = document.getElementById('cameraInput');
   const captureBtn = document.getElementById('captureBtn');
   const stepBadge = document.getElementById('stepBadge');
   const camSection = document.getElementById('camSection');
@@ -218,43 +213,9 @@
   const statusMsg = document.getElementById('statusMsg');
   const rollInput = document.getElementById('rollNo');
   const camGuideText = document.getElementById('camGuideText');
+  const camIconDisplay = document.getElementById('camIconDisplay');
   const cropGuideText = document.getElementById('cropGuideText');
-  const cameraErrorBox = document.getElementById('cameraErrorBox');
   const fileSizeBadge = document.getElementById('fileSizeBadge');
-
-  // Start Live Camera
-  function startCamera() {
-    const constraints = { 
-      video: { 
-        facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      } 
-    };
-
-    navigator.mediaDevices.getUserMedia(constraints)
-      .then(stream => {
-        video.srcObject = stream;
-        cameraErrorBox.innerHTML = "";
-        captureBtn.disabled = false;
-      })
-      .catch(err => {
-        console.error("Camera Access Error:", err);
-        captureBtn.disabled = true;
-        showPermissionHelp();
-      });
-  }
-
-  function showPermissionHelp() {
-    cameraErrorBox.innerHTML = `
-      <div class="alert alert-danger text-start mt-3 p-2 small">
-        <strong><span class="material-icons align-middle fs-6">videocam_off</span> Camera Permission Needed!</strong><br>
-        Browser ke Address Bar me 🔒 Lock icon par tap karke Camera <b>ALLOW</b> karein aur Retry dabayein.
-        <button onclick="startCamera()" class="btn btn-sm btn-danger w-100 mt-2">Retry Camera</button>
-      </div>`;
-  }
-
-  startCamera();
 
   // Roll Number (+1) Increment
   document.getElementById('btnIncrement').addEventListener('click', () => {
@@ -262,50 +223,56 @@
     rollInput.value = !isNaN(currentVal) ? currentVal + 1 : "1001";
   });
 
-  // Capture Full Image from Camera and Open Cropper
+  // Open Phone's Full Native Camera
   captureBtn.addEventListener('click', () => {
     if (!rollInput.value.trim()) {
       alert("Kripya Roll Number enter karein!");
       return;
     }
+    cameraInput.click();
+  });
 
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = video.videoWidth || 1280;
-    tempCanvas.height = video.videoHeight || 720;
-    const ctx = tempCanvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+  // Handle Photo Taken from Native Camera
+  cameraInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    cropperImage.src = tempCanvas.toDataURL('image/jpeg');
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      cropperImage.src = event.target.result;
 
-    camSection.style.display = "none";
-    cropSection.style.display = "block";
+      camSection.style.display = "none";
+      cropSection.style.display = "block";
 
-    if (cropper) cropper.destroy();
+      if (cropper) cropper.destroy();
 
-    if (currentStep === "photo") {
-      stepBadge.innerText = "Step 1: Crop Passport Photo (3.5 : 4.5)";
-      stepBadge.className = "badge bg-warning text-dark px-3 py-2 fs-6 rounded-pill";
-      cropGuideText.innerText = "Passport Photo ko 3.5:4.5 ratio me adjust/crop karein:";
+      if (currentStep === "photo") {
+        stepBadge.innerText = "Step 1: Crop Passport Photo (3.5 : 4.5)";
+        stepBadge.className = "badge bg-warning text-dark px-3 py-2 fs-6 rounded-pill";
+        cropGuideText.innerText = "Passport Photo ko 3.5:4.5 ratio me adjust/crop karein:";
 
-      cropper = new Cropper(cropperImage, {
-        aspectRatio: 350 / 450,
-        viewMode: 1,
-        autoCropArea: 0.85,
-        responsive: true
-      });
+        cropper = new Cropper(cropperImage, {
+          aspectRatio: 350 / 450,
+          viewMode: 1,
+          autoCropArea: 0.85,
+          responsive: true
+        });
 
-    } else if (currentStep === "sign") {
-      stepBadge.innerText = "Step 2: Crop Signature (Horizontal Strip)";
-      stepBadge.className = "badge bg-info text-dark px-3 py-2 fs-6 rounded-pill";
-      cropGuideText.innerText = "Signature area ko adjust/crop karein:";
+      } else if (currentStep === "sign") {
+        stepBadge.innerText = "Step 2: Crop Signature (Horizontal Strip)";
+        stepBadge.className = "badge bg-info text-dark px-3 py-2 fs-6 rounded-pill";
+        cropGuideText.innerText = "Signature area ko adjust/crop karein:";
 
-      cropper = new Cropper(cropperImage, {
-        aspectRatio: 350 / 100,
-        viewMode: 1,
-        autoCropArea: 0.85,
-        responsive: true
-      });
-    }
+        cropper = new Cropper(cropperImage, {
+          aspectRatio: 350 / 100,
+          viewMode: 1,
+          autoCropArea: 0.85,
+          responsive: true
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+    cameraInput.value = ""; // Reset file input
   });
 
   // Confirm Crop Button Logic
@@ -327,8 +294,9 @@
       cropSection.style.display = "none";
       camSection.style.display = "block";
 
-      camGuideText.innerText = "Full Camera: Signature ki photo click karein, fir crop ka option aayega.";
-      captureBtn.innerHTML = '<span class="material-icons">draw</span> Capture Signature';
+      camIconDisplay.innerText = "draw";
+      camGuideText.innerText = "Signature ki photo khichne ke liye niche button par click karein.";
+      captureBtn.innerHTML = '<span class="material-icons">draw</span> Open Camera for Signature';
       stepBadge.innerText = "Step 2: Click Signature Photo";
       stepBadge.className = "badge bg-info text-dark px-3 py-2 fs-6 rounded-pill";
 
@@ -420,9 +388,10 @@
     cropSection.style.display = "none";
     camSection.style.display = "block";
 
-    camGuideText.innerText = "Photo click karein, uske baad Crop box aayega.";
-    captureBtn.innerHTML = '<span class="material-icons">photo_camera</span> Capture Photo';
-    stepBadge.innerText = "Step 1: Click Passport Photo";
+    camIconDisplay.innerText = "photo_camera";
+    camGuideText.innerText = "Passport Photo khichne ke liye niche button par click karein.";
+    captureBtn.innerHTML = '<span class="material-icons">photo_camera</span> Open Full Camera';
+    stepBadge.innerText = "Step 1: Passport Photo";
     stepBadge.className = "badge bg-primary px-3 py-2 fs-6 rounded-pill";
     statusMsg.innerText = "";
     uploadBtn.disabled = false;
