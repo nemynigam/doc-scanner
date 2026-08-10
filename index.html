@@ -1,11 +1,279 @@
-// Center-Crop Engine (Distortion / Stretch Fix)
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Smart Student Doc Capture</title>
+  
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <style>
+    * { 
+      box-sizing: border-box; 
+    }
+    html, body {
+      width: 100vw;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .app-wrapper {
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+    }
+    .app-card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      overflow: hidden;
+      width: 100%;
+      max-width: 480px;
+      margin: auto;
+    }
+    .app-header {
+      background: linear-gradient(45deg, #4e54c8, #8f94fb);
+      color: white;
+      padding: 16px;
+      text-align: center;
+    }
+    
+    /* Live Frame Container */
+    .camera-frame-container {
+      position: relative;
+      margin: 0 auto 15px auto;
+      overflow: hidden;
+      border: 3px dashed #4e54c8;
+      border-radius: 12px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Step 1: 3.5 x 4.5 Passport Ratio Frame */
+    .passport-frame {
+      width: 210px;
+      height: 270px;
+    }
+
+    /* Step 2: Wide Signature Horizontal Strip Frame */
+    .signature-frame {
+      width: 300px;
+      height: 100px;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .preview-img {
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      max-width: 100%;
+      height: auto;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .btn-material {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-radius: 8px;
+      font-weight: 600;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-wrapper">
+  <div class="app-card">
+    <!-- Header -->
+    <div class="app-header">
+      <h5 class="m-0 fw-bold"><span class="material-icons align-middle me-1">assignment_ind</span> Doc Scanner Pro</h5>
+      <small class="opacity-75">Passport (Color) & Signature (B&W)</small>
+    </div>
+
+    <div class="p-3 p-sm-4">
+      <!-- Roll Number Entry -->
+      <div class="mb-3">
+        <label class="form-label fw-bold text-secondary">Roll Number Entry</label>
+        <div class="input-group">
+          <span class="input-group-text bg-light"><span class="material-icons text-primary">badge</span></span>
+          <input type="text" id="rollNo" class="form-control form-control-lg fw-bold" placeholder="Enter Roll No." value="1001">
+          <button class="btn btn-outline-primary" type="button" id="btnIncrement" title="Next Roll Number (+1)">
+            <span class="material-icons align-middle">add</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Stepper Status Badge -->
+      <div class="text-center mb-3">
+        <span id="stepBadge" class="badge bg-primary px-3 py-2 fs-6 rounded-pill">Step 1: Passport Photo (Color)</span>
+      </div>
+
+      <!-- Camera Section with Live Preview Inside Frame -->
+      <div id="camSection" class="text-center">
+        
+        <!-- Live Video Stream Frame -->
+        <div id="frameBox" class="camera-frame-container passport-frame">
+          <video id="video" autoplay playsinline muted></video>
+        </div>
+
+        <p class="text-muted small fw-bold mb-3" id="frameGuideText">
+          3.5 x 4.5 Passport Frame (Full Color Photo)
+        </p>
+
+        <div class="d-grid gap-2">
+          <button id="captureBtn" class="btn btn-primary btn-lg btn-material py-2 fs-6">
+            <span class="material-icons">photo_camera</span> Capture Photo
+          </button>
+        </div>
+        
+        <div id="cameraErrorBox"></div>
+      </div>
+
+      <!-- Step 1 Review / Retake Options -->
+      <div id="step1Review" class="text-center" style="display: none;">
+        <p class="text-muted mb-2 fw-bold">Passport Photo Preview (Color)</p>
+        <img id="photoPreview" class="preview-img mb-3" style="max-height: 220px;" alt="Passport Preview"><br>
+        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+          <button id="retakePhotoBtn" class="btn btn-outline-danger btn-material">
+            <span class="material-icons">refresh</span> Re-click Photo
+          </button>
+          <button id="proceedToSignBtn" class="btn btn-success btn-material">
+            <span class="material-icons">arrow_forward</span> Next: Signature
+          </button>
+        </div>
+      </div>
+
+      <!-- Final Combined Result & Upload Section -->
+      <div id="resultContainer" class="text-center" style="display: none;">
+        <h6 class="fw-bold text-success mb-2"><span class="material-icons align-middle">check_circle</span> Combined Preview Ready</h6>
+        <img id="finalImage" class="preview-img mb-3" alt="Final Combined Document"><br>
+        
+        <div class="d-grid gap-2">
+          <button id="uploadBtn" class="btn btn-success btn-lg btn-material py-2 fs-6">
+            <span class="material-icons">cloud_upload</span> Upload to Google Drive
+          </button>
+          <button id="resetAllBtn" class="btn btn-outline-secondary btn-material">
+            <span class="material-icons">restart_alt</span> Reset & Start Over
+          </button>
+        </div>
+        <p id="statusMsg" class="mt-3 fw-bold mb-0 small"></p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // Google Apps Script Web App Executable URL
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyi49UydSaJbCD3HE0U9usViBR6P8wlw9AjX0LWSPWvBqYzJQkRnHXtcsh9iA9t0BR1/exec";
+
+  let currentStep = "photo";
+  let photoDataCanvas = null;
+  let signDataCanvas = null;
+
+  const video = document.getElementById('video');
+  const frameBox = document.getElementById('frameBox');
+  const captureBtn = document.getElementById('captureBtn');
+  const stepBadge = document.getElementById('stepBadge');
+  const camSection = document.getElementById('camSection');
+  const step1Review = document.getElementById('step1Review');
+  const photoPreview = document.getElementById('photoPreview');
+  const resultContainer = document.getElementById('resultContainer');
+  const finalImage = document.getElementById('finalImage');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const statusMsg = document.getElementById('statusMsg');
+  const rollInput = document.getElementById('rollNo');
+  const frameGuideText = document.getElementById('frameGuideText');
+  const cameraErrorBox = document.getElementById('cameraErrorBox');
+
+  // Start Live Camera
+  function startCamera() {
+    const constraints = { 
+      video: { 
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      } 
+    };
+
+    navigator.mediaDevices.getUserMedia(constraints)
+      .then(stream => {
+        video.srcObject = stream;
+        cameraErrorBox.innerHTML = "";
+        captureBtn.disabled = false;
+      })
+      .catch(err => {
+        console.error("Camera Access Error:", err);
+        captureBtn.disabled = true;
+        showPermissionHelp();
+      });
+  }
+
+  function showPermissionHelp() {
+    cameraErrorBox.innerHTML = `
+      <div class="alert alert-danger text-start mt-3 p-2 small">
+        <strong><span class="material-icons align-middle fs-6">videocam_off</span> Camera Permission Needed!</strong><br>
+        Browser ke Address Bar me 🔒 Lock icon par tap karke Camera <b>ALLOW</b> karein aur Retry dabayein.
+        <button onclick="startCamera()" class="btn btn-sm btn-danger w-100 mt-2">Retry Camera</button>
+      </div>`;
+  }
+
+  startCamera();
+
+  // Roll Number (+1) Increment
+  document.getElementById('btnIncrement').addEventListener('click', () => {
+    let currentVal = parseInt(rollInput.value);
+    rollInput.value = !isNaN(currentVal) ? currentVal + 1 : "1001";
+  });
+
+  // Capture Button Logic
+  captureBtn.addEventListener('click', () => {
+    if (!rollInput.value.trim()) {
+      alert("Kripya Roll Number enter karein!");
+      return;
+    }
+
+    if (currentStep === "photo") {
+      // Step 1: Passport Photo (Color - No B&W Filter, Distortion-Free)
+      photoDataCanvas = captureFromFrame(350, 450, false);
+      photoPreview.src = photoDataCanvas.toDataURL('image/jpeg');
+      
+      camSection.style.display = "none";
+      step1Review.style.display = "block";
+      stepBadge.innerText = "Review Passport Photo";
+      stepBadge.className = "badge bg-warning text-dark px-3 py-2 fs-6 rounded-pill";
+
+    } else if (currentStep === "sign") {
+      // Step 2: Signature Photo (B&W Filter Applied, Distortion-Free)
+      signDataCanvas = captureFromFrame(350, 120, true);
+      camSection.style.display = "none";
+      combineImages();
+    }
+  });
+
+  // Distortion-Free Center Crop Engine
   function captureFromFrame(targetWidth, targetHeight, isBlackAndWhite) {
     const canvas = document.createElement('canvas');
     canvas.width = targetWidth;
     canvas.height = targetHeight;
     const ctx = canvas.getContext('2d');
 
-    // Camera Video Stream Ki Actual Aspect Ratio Calculation
+    // Camera Video Stream Ki Actual Resolution Read Karna
     let videoWidth = video.videoWidth || 1280;
     let videoHeight = video.videoHeight || 720;
 
@@ -14,7 +282,7 @@
 
     let sourceWidth, sourceHeight, startX, startY;
 
-    // Calculate crop coordinates without distorting/stretching photo
+    // Aspect-Ratio Preserving Crop Math (Bina stretch kiye center crop)
     if (videoRatio > targetRatio) {
       sourceHeight = videoHeight;
       sourceWidth = videoHeight * targetRatio;
@@ -27,14 +295,14 @@
       startY = (videoHeight - sourceHeight) / 2;
     }
 
-    // Exact center crop drawn to target canvas
+    // Exact Center Portion Draw Karna (No Stretch/Distortion)
     ctx.drawImage(
       video, 
-      startX, startY, sourceWidth, sourceHeight, // Crop area from live camera
-      0, 0, targetWidth, targetHeight           // Drawn size on frame
+      startX, startY, sourceWidth, sourceHeight, // Camera Stream Crop Box
+      0, 0, targetWidth, targetHeight           // Target Frame Size
     );
 
-    // Apply B&W + High Contrast ONLY if Signature step
+    // B&W + High Contrast Filter (Only Signature ke liye)
     if (isBlackAndWhite) {
       const imgData = ctx.getImageData(0, 0, targetWidth, targetHeight);
       const data = imgData.data;
@@ -42,13 +310,12 @@
       for (let i = 0; i < data.length; i += 4) {
         let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
         
-        // High contrast background cleanup
         if (avg > 130) { 
-          data[i] = 255;
-          data[i + 1] = 255;
-          data[i + 2] = 255;
+          data[i] = 255;     // Red
+          data[i + 1] = 255; // Green
+          data[i + 2] = 255; // Blue
         } else {
-          let darkVal = avg * 0.6;
+          let darkVal = avg * 0.6; // Dark Ink
           data[i] = darkVal;
           data[i + 1] = darkVal;
           data[i + 2] = darkVal;
@@ -59,3 +326,117 @@
 
     return canvas;
   }
+
+  // Next: Signature Mode
+  document.getElementById('proceedToSignBtn').addEventListener('click', () => {
+    currentStep = "sign";
+    step1Review.style.display = "none";
+    camSection.style.display = "block";
+
+    frameBox.className = "camera-frame-container signature-frame";
+    frameGuideText.innerText = "Horizontal Strip Frame (Signature - Pure B&W Auto Filter)";
+    captureBtn.innerHTML = '<span class="material-icons">draw</span> Capture Signature';
+    stepBadge.innerText = "Step 2: Signature Capture (B&W)";
+    stepBadge.className = "badge bg-info text-dark px-3 py-2 fs-6 rounded-pill";
+  });
+
+  // Retake Photo
+  document.getElementById('retakePhotoBtn').addEventListener('click', () => {
+    currentStep = "photo";
+    step1Review.style.display = "none";
+    camSection.style.display = "block";
+
+    frameBox.className = "camera-frame-container passport-frame";
+    frameGuideText.innerText = "3.5 x 4.5 Passport Frame (Full Color Photo)";
+    captureBtn.innerHTML = '<span class="material-icons">photo_camera</span> Capture Photo';
+    stepBadge.innerText = "Step 1: Passport Photo (Color)";
+    stepBadge.className = "badge bg-primary px-3 py-2 fs-6 rounded-pill";
+  });
+
+  // Reset All
+  document.getElementById('resetAllBtn').addEventListener('click', () => {
+    currentStep = "photo";
+    resultContainer.style.display = "none";
+    camSection.style.display = "block";
+
+    frameBox.className = "camera-frame-container passport-frame";
+    frameGuideText.innerText = "3.5 x 4.5 Passport Frame (Full Color Photo)";
+    captureBtn.innerHTML = '<span class="material-icons">photo_camera</span> Capture Photo';
+    stepBadge.innerText = "Step 1: Passport Photo (Color)";
+    stepBadge.className = "badge bg-primary px-3 py-2 fs-6 rounded-pill";
+    statusMsg.innerText = "";
+    uploadBtn.disabled = false;
+  });
+
+  // Combine Images Top-to-Bottom
+  function combineImages() {
+    const finalCanvas = document.createElement('canvas');
+    const ctx = finalCanvas.getContext('2d');
+
+    const totalWidth = 350;
+    const totalHeight = 450 + 120 + 30; 
+
+    finalCanvas.width = totalWidth;
+    finalCanvas.height = totalHeight;
+
+    // Pure White Background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, totalWidth, totalHeight);
+
+    // Draw Color Passport Photo (Top)
+    ctx.drawImage(photoDataCanvas, 0, 0);
+
+    // Light Separator Line
+    ctx.strokeStyle = "#e0e0e0";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(10, 460);
+    ctx.lineTo(340, 460);
+    ctx.stroke();
+
+    // Draw B&W Signature (Bottom)
+    ctx.drawImage(signDataCanvas, 0, 470);
+
+    finalImage.src = finalCanvas.toDataURL('image/jpeg');
+    resultContainer.style.display = 'block';
+    stepBadge.innerText = "Step 3: Confirm & Upload";
+    stepBadge.className = "badge bg-success px-3 py-2 fs-6 rounded-pill";
+  }
+
+  // Upload to Google Drive via fetch POST
+  uploadBtn.addEventListener('click', () => {
+    const rollNo = rollInput.value.trim();
+    const imageData = finalImage.src;
+
+    statusMsg.style.color = "#0d6efd";
+    statusMsg.innerText = "Uploading to Google Drive...";
+    uploadBtn.disabled = true;
+
+    fetch(SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({ rollNo: rollNo, image: imageData })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "success") {
+        statusMsg.style.color = "#198754";
+        statusMsg.innerText = "✅ Upload Successful! Saved in Drive.";
+        
+        let currentVal = parseInt(rollInput.value);
+        if (!isNaN(currentVal)) rollInput.value = currentVal + 1;
+      } else {
+        statusMsg.style.color = "#dc3545";
+        statusMsg.innerText = "❌ Upload Failed: " + data.message;
+        uploadBtn.disabled = false;
+      }
+    })
+    .catch(err => {
+      statusMsg.style.color = "#dc3545";
+      statusMsg.innerText = "❌ Error: " + err;
+      uploadBtn.disabled = false;
+    });
+  });
+</script>
+
+</body>
+</html>
