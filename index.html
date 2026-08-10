@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Smart Student Doc Capture with Cropper</title>
+  <title>Smart Student Doc Capture</title>
   
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -118,7 +118,7 @@
     <!-- Header -->
     <div class="app-header">
       <h5 class="m-0 fw-bold"><span class="material-icons align-middle me-1">assignment_ind</span> Doc Scanner Pro</h5>
-      <small class="opacity-75">Interactive Cropping (Passport 3.5:4.5 & Signature)</small>
+      <small class="opacity-75">Auto Compress to &lt; 29 KB</small>
     </div>
 
     <div class="p-3 p-sm-4">
@@ -178,6 +178,10 @@
       <!-- 3. Final Combined Result & Upload Section -->
       <div id="resultContainer" class="text-center" style="display: none;">
         <h6 class="fw-bold text-success mb-2"><span class="material-icons align-middle">check_circle</span> Combined Document Ready</h6>
+        
+        <!-- Live File Size Badge -->
+        <span id="fileSizeBadge" class="badge bg-dark text-white mb-2 px-3 py-1 fs-6">Size: Calculating...</span><br>
+        
         <img id="finalImage" class="preview-img mb-3" alt="Final Combined Document"><br>
         
         <div class="d-grid gap-2">
@@ -202,7 +206,7 @@
   // Google Apps Script Web App Executable URL
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyi49UydSaJbCD3HE0U9usViBR6P8wlw9AjX0LWSPWvBqYzJQkRnHXtcsh9iA9t0BR1/exec";
 
-  let currentStep = "photo"; // 'photo', 'sign'
+  let currentStep = "photo";
   let cropper = null;
   let photoDataCanvas = null;
   let signDataCanvas = null;
@@ -224,6 +228,7 @@
   const frameGuideText = document.getElementById('frameGuideText');
   const cropGuideText = document.getElementById('cropGuideText');
   const cameraErrorBox = document.getElementById('cameraErrorBox');
+  const fileSizeBadge = document.getElementById('fileSizeBadge');
 
   // Start Live Camera
   function startCamera() {
@@ -272,21 +277,17 @@
       return;
     }
 
-    // Capture Full Raw Frame from Camera Video
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = video.videoWidth || 1280;
     tempCanvas.height = video.videoHeight || 720;
     const ctx = tempCanvas.getContext('2d');
     ctx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
 
-    // Load Raw Image into Cropper Image Element
     cropperImage.src = tempCanvas.toDataURL('image/jpeg');
 
-    // Hide Camera, Show Cropper UI
     camSection.style.display = "none";
     cropSection.style.display = "block";
 
-    // Destroy Previous Cropper Instance if exists
     if (cropper) cropper.destroy();
 
     if (currentStep === "photo") {
@@ -294,7 +295,6 @@
       stepBadge.className = "badge bg-warning text-dark px-3 py-2 fs-6 rounded-pill";
       cropGuideText.innerText = "Box ko adjust karke 3.5x4.5 Passport Photo crop karein:";
 
-      // Initialize Cropper with Passport Aspect Ratio (3.5 / 4.5 = 0.777)
       cropper = new Cropper(cropperImage, {
         aspectRatio: 350 / 450,
         viewMode: 1,
@@ -307,7 +307,6 @@
       stepBadge.className = "badge bg-info text-dark px-3 py-2 fs-6 rounded-pill";
       cropGuideText.innerText = "Box ko adjust karke Signature crop karein:";
 
-      // Initialize Cropper with Signature Wide Strip Aspect Ratio (350 / 120 = 2.91)
       cropper = new Cropper(cropperImage, {
         aspectRatio: 350 / 120,
         viewMode: 1,
@@ -317,18 +316,16 @@
     }
   });
 
-  // Confirm Crop Button Event Listener
+  // Confirm Crop Button Logic
   confirmCropBtn.addEventListener('click', () => {
     if (!cropper) return;
 
     if (currentStep === "photo") {
-      // Get Cropped Canvas (Full Color for Passport Photo)
       photoDataCanvas = cropper.getCroppedCanvas({
-        width: 350,
-        height: 450
+        width: 300,
+        height: 385
       });
 
-      // Move to Step 2: Signature Mode
       currentStep = "sign";
       cropper.destroy();
       cropper = null;
@@ -343,14 +340,12 @@
       stepBadge.className = "badge bg-info text-dark px-3 py-2 fs-6 rounded-pill";
 
     } else if (currentStep === "sign") {
-      // Get Cropped Canvas for Signature
       let rawSignCanvas = cropper.getCroppedCanvas({
-        width: 350,
-        height: 120
+        width: 300,
+        height: 100
       });
 
-      // Apply Pure Black & White Filter + Background Cleaner
-      signDataCanvas = applyBWFilter(rawSignCanvas, 350, 120);
+      signDataCanvas = applyBWFilter(rawSignCanvas, 300, 100);
 
       cropper.destroy();
       cropper = null;
@@ -360,7 +355,7 @@
     }
   });
 
-  // Re-click / Retake Current Step
+  // Retake Current Step
   retakeBtn.addEventListener('click', () => {
     if (cropper) {
       cropper.destroy();
@@ -370,7 +365,7 @@
     camSection.style.display = "block";
   });
 
-  // Apply B&W + High Contrast Background Filter for Signature
+  // Apply B&W Filter for Signature
   function applyBWFilter(sourceCanvas, width, height) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -385,13 +380,12 @@
     for (let i = 0; i < data.length; i += 4) {
       let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
       
-      // High-contrast threshold: Light areas become pure white, dark ink stays black
       if (avg > 135) { 
-        data[i] = 255;     // R
-        data[i + 1] = 255; // G
-        data[i + 2] = 255; // B
+        data[i] = 255;
+        data[i + 1] = 255;
+        data[i + 2] = 255;
       } else {
-        let darkVal = avg * 0.5; // Darker ink
+        let darkVal = avg * 0.5;
         data[i] = darkVal;
         data[i + 1] = darkVal;
         data[i + 2] = darkVal;
@@ -401,7 +395,27 @@
     return canvas;
   }
 
-  // Reset All Button Event
+  // Calculate Base64 String Byte Size in KB
+  function getByteSizeKB(base64DataUrl) {
+    const base64Str = base64DataUrl.split(',')[1];
+    const bytes = (base64Str.length * 3) / 4;
+    return (bytes / 1024).toFixed(1);
+  }
+
+  // Dynamic Image Compression Engine (< 28 KB target)
+  function getCompressedJpegDataUrl(canvas, maxKB = 28) {
+    let quality = 0.70; // Start at 70% quality
+    let dataUrl = canvas.toDataURL('image/jpeg', quality);
+    
+    // Loop to decrease quality if size exceeds limit
+    while (getByteSizeKB(dataUrl) > maxKB && quality > 0.05) {
+      quality -= 0.05;
+      dataUrl = canvas.toDataURL('image/jpeg', quality);
+    }
+    return dataUrl;
+  }
+
+  // Reset All Button
   document.getElementById('resetAllBtn').addEventListener('click', () => {
     currentStep = "photo";
     if (cropper) {
@@ -421,42 +435,48 @@
     uploadBtn.disabled = false;
   });
 
-  // Combine Images Top-to-Bottom
+  // Combine Images Top-to-Bottom with Auto-Compression
   function combineImages() {
     const finalCanvas = document.createElement('canvas');
     const ctx = finalCanvas.getContext('2d');
 
-    const totalWidth = 350;
-    const totalHeight = 450 + 120 + 30; 
+    const totalWidth = 300;
+    const totalHeight = 385 + 100 + 20; 
 
     finalCanvas.width = totalWidth;
     finalCanvas.height = totalHeight;
 
-    // Pure White Background
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-    // Draw Color Passport Photo (Top)
+    // Draw Passport Photo
     ctx.drawImage(photoDataCanvas, 0, 0);
 
-    // Light Separator Line
+    // Separator Line
     ctx.strokeStyle = "#e0e0e0";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(10, 460);
-    ctx.lineTo(340, 460);
+    ctx.moveTo(10, 392);
+    ctx.lineTo(290, 392);
     ctx.stroke();
 
-    // Draw B&W Signature (Bottom)
-    ctx.drawImage(signDataCanvas, 0, 470);
+    // Draw Signature
+    ctx.drawImage(signDataCanvas, 0, 400);
 
-    finalImage.src = finalCanvas.toDataURL('image/jpeg');
+    // Auto Compress JPEG to be strictly under 28-29 KB
+    const compressedDataUrl = getCompressedJpegDataUrl(finalCanvas, 28);
+    const finalKB = getByteSizeKB(compressedDataUrl);
+
+    finalImage.src = compressedDataUrl;
+    fileSizeBadge.innerText = `Size: ${finalKB} KB (< 29 KB)`;
+    fileSizeBadge.className = finalKB < 29 ? "badge bg-success mb-2 px-3 py-1 fs-6" : "badge bg-danger mb-2 px-3 py-1 fs-6";
+
     resultContainer.style.display = 'block';
     stepBadge.innerText = "Step 3: Confirm & Upload";
     stepBadge.className = "badge bg-success px-3 py-2 fs-6 rounded-pill";
   }
 
-  // Upload to Google Drive via fetch POST
+  // Upload to Google Drive
   uploadBtn.addEventListener('click', () => {
     const rollNo = rollInput.value.trim();
     const imageData = finalImage.src;
@@ -473,7 +493,7 @@
     .then(data => {
       if (data.status === "success") {
         statusMsg.style.color = "#198754";
-        statusMsg.innerText = "✅ Upload Successful! Saved in Drive.";
+        statusMsg.innerText = `✅ Uploaded ${data.fileName} (${data.sizeKB} KB) to Drive.`;
         
         let currentVal = parseInt(rollInput.value);
         if (!isNaN(currentVal)) rollInput.value = currentVal + 1;
