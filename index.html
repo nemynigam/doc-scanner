@@ -11,6 +11,8 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <!-- Cropper.js CSS -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+  <!-- SweetAlert2 Pop-up CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 
   <style>
     * { 
@@ -201,6 +203,8 @@
 
 <!-- Cropper.js JavaScript -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+<!-- SweetAlert2 Pop-up JS -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
   // Google Apps Script Web App Executable URL
@@ -414,8 +418,8 @@
     return dataUrl;
   }
 
-  // Reset All Button
-  document.getElementById('resetAllBtn').addEventListener('click', () => {
+  // Reset to Step 1 for Next Student
+  function resetAppForNextStudent() {
     currentStep = "photo";
     if (cropper) {
       cropper.destroy();
@@ -432,31 +436,30 @@
     stepBadge.className = "badge bg-primary px-3 py-2 fs-6 rounded-pill";
     statusMsg.innerText = "";
     uploadBtn.disabled = false;
-  });
+  }
+
+  document.getElementById('resetAllBtn').addEventListener('click', resetAppForNextStudent);
 
   // Combine Images into Exact 3.5cm x 5.5cm (350px x 550px) with Zero Gap / Direct Overlap
   function combineImages() {
     const finalCanvas = document.createElement('canvas');
     const ctx = finalCanvas.getContext('2d');
 
-    // Total Dimension: 3.5cm x 5.5cm Ratio (350px width x 550px height)
     const totalWidth = 350;
     const totalHeight = 550; 
 
     finalCanvas.width = totalWidth;
     finalCanvas.height = totalHeight;
 
-    // Background Pure White
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-    // 1. Draw Passport Photo (3.5cm x 4.5cm -> 350px x 450px) at Top
+    // Draw Passport Photo (Top)
     ctx.drawImage(photoDataCanvas, 0, 0, 350, 450);
 
-    // 2. Overlap Signature Strip directly on bottom (450px to 550px) without any white gap
+    // Overlap Signature Strip directly on bottom (450px to 550px)
     ctx.drawImage(signDataCanvas, 0, 450, 350, 100);
 
-    // Auto Compress JPEG to be strictly under 28-29 KB
     const compressedDataUrl = getCompressedJpegDataUrl(finalCanvas, 28);
     const finalKB = getByteSizeKB(compressedDataUrl);
 
@@ -469,7 +472,7 @@
     stepBadge.className = "badge bg-success px-3 py-2 fs-6 rounded-pill";
   }
 
-  // Upload to Google Drive
+  // Upload to Google Drive & Trigger SweetAlert2 Pop-up
   uploadBtn.addEventListener('click', () => {
     const rollNo = rollInput.value.trim();
     const imageData = finalImage.src;
@@ -484,22 +487,55 @@
     })
     .then(res => res.json())
     .then(data => {
+      uploadBtn.disabled = false;
+      statusMsg.innerText = "";
+
       if (data.status === "success") {
-        statusMsg.style.color = "#198754";
-        statusMsg.innerText = "✅ Uploaded " + data.fileName + " (" + data.sizeKB + " KB) to Drive.";
-        
-        let currentVal = parseInt(rollInput.value);
-        if (!isNaN(currentVal)) rollInput.value = currentVal + 1;
+        let sizeInfo = data.sizeKB ? data.sizeKB + " KB" : getByteSizeKB(imageData) + " KB";
+        let uploadedFileName = rollNo + ".jpg";
+
+        // Success Pop-up Box
+        Swal.fire({
+          title: "<strong>Upload Successful!</strong>",
+          icon: "success",
+          html: `
+            <div class="text-start fs-6">
+              <p class="mb-1"><b>File Name:</b> <span class="text-primary">${uploadedFileName}</span></p>
+              <p class="mb-1"><b>File Size:</b> <span class="badge bg-success">${sizeInfo}</span></p>
+              <p class="mb-0"><b>Status:</b> Saved in Google Drive Folder</p>
+            </div>
+          `,
+          confirmButtonText: '<span class="material-icons align-middle me-1">check_circle</span> OK / Next Student',
+          confirmButtonColor: "#198754",
+          allowOutsideClick: false
+        }).then((result) => {
+          if (result.isConfirmed) {
+            // Roll Number (+1) Increment
+            let currentVal = parseInt(rollInput.value);
+            if (!isNaN(currentVal)) {
+              rollInput.value = currentVal + 1;
+            }
+            // Auto Reset App for Next Student
+            resetAppForNextStudent();
+          }
+        });
+
       } else {
-        statusMsg.style.color = "#dc3545";
-        statusMsg.innerText = "❌ Upload Failed: " + data.message;
-        uploadBtn.disabled = false;
+        Swal.fire({
+          icon: 'error',
+          title: 'Upload Failed',
+          text: data.message || 'Unknown server error.'
+        });
       }
     })
     .catch(err => {
-      statusMsg.style.color = "#dc3545";
-      statusMsg.innerText = "❌ Error: " + err;
       uploadBtn.disabled = false;
+      statusMsg.innerText = "";
+      Swal.fire({
+        icon: 'error',
+        title: 'Network Error',
+        text: err.toString()
+      });
     });
   });
 </script>
