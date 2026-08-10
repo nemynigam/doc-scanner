@@ -118,7 +118,7 @@
     <!-- Header -->
     <div class="app-header">
       <h5 class="m-0 fw-bold"><span class="material-icons align-middle me-1">assignment_ind</span> Doc Scanner Pro</h5>
-      <small class="opacity-75">Auto Compress to &lt; 29 KB</small>
+      <small class="opacity-75">3.5 cm x 5.5 cm Overlapped Merge (&lt; 29 KB)</small>
     </div>
 
     <div class="p-3 p-sm-4">
@@ -177,7 +177,7 @@
 
       <!-- 3. Final Combined Result & Upload Section -->
       <div id="resultContainer" class="text-center" style="display: none;">
-        <h6 class="fw-bold text-success mb-2"><span class="material-icons align-middle">check_circle</span> Combined Document Ready</h6>
+        <h6 class="fw-bold text-success mb-2"><span class="material-icons align-middle">check_circle</span> Merged Preview (3.5cm x 5.5cm)</h6>
         
         <!-- Live File Size Badge -->
         <span id="fileSizeBadge" class="badge bg-dark text-white mb-2 px-3 py-1 fs-6">Size: Calculating...</span><br>
@@ -308,7 +308,7 @@
       cropGuideText.innerText = "Box ko adjust karke Signature crop karein:";
 
       cropper = new Cropper(cropperImage, {
-        aspectRatio: 350 / 120,
+        aspectRatio: 350 / 100,
         viewMode: 1,
         autoCropArea: 0.8,
         responsive: true
@@ -322,8 +322,8 @@
 
     if (currentStep === "photo") {
       photoDataCanvas = cropper.getCroppedCanvas({
-        width: 300,
-        height: 385
+        width: 350,
+        height: 450
       });
 
       currentStep = "sign";
@@ -341,11 +341,11 @@
 
     } else if (currentStep === "sign") {
       let rawSignCanvas = cropper.getCroppedCanvas({
-        width: 300,
+        width: 350,
         height: 100
       });
 
-      signDataCanvas = applyBWFilter(rawSignCanvas, 300, 100);
+      signDataCanvas = applyBWFilter(rawSignCanvas, 350, 100);
 
       cropper.destroy();
       cropper = null;
@@ -404,10 +404,9 @@
 
   // Dynamic Image Compression Engine (< 28 KB target)
   function getCompressedJpegDataUrl(canvas, maxKB = 28) {
-    let quality = 0.70; // Start at 70% quality
+    let quality = 0.70;
     let dataUrl = canvas.toDataURL('image/jpeg', quality);
     
-    // Loop to decrease quality if size exceeds limit
     while (getByteSizeKB(dataUrl) > maxKB && quality > 0.05) {
       quality -= 0.05;
       dataUrl = canvas.toDataURL('image/jpeg', quality);
@@ -435,40 +434,34 @@
     uploadBtn.disabled = false;
   });
 
-  // Combine Images Top-to-Bottom with Auto-Compression
+  // Combine Images into Exact 3.5cm x 5.5cm (350px x 550px) with Zero Gap / Direct Overlap
   function combineImages() {
     const finalCanvas = document.createElement('canvas');
     const ctx = finalCanvas.getContext('2d');
 
-    const totalWidth = 300;
-    const totalHeight = 385 + 100 + 20; 
+    // Total Dimension: 3.5cm x 5.5cm Ratio (350px width x 550px height)
+    const totalWidth = 350;
+    const totalHeight = 550; 
 
     finalCanvas.width = totalWidth;
     finalCanvas.height = totalHeight;
 
+    // Background Pure White
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-    // Draw Passport Photo
-    ctx.drawImage(photoDataCanvas, 0, 0);
+    // 1. Draw Passport Photo (3.5cm x 4.5cm -> 350px x 450px) at Top
+    ctx.drawImage(photoDataCanvas, 0, 0, 350, 450);
 
-    // Separator Line
-    ctx.strokeStyle = "#e0e0e0";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(10, 392);
-    ctx.lineTo(290, 392);
-    ctx.stroke();
-
-    // Draw Signature
-    ctx.drawImage(signDataCanvas, 0, 400);
+    // 2. Overlap Signature Strip directly on bottom (450px to 550px) without any white gap
+    ctx.drawImage(signDataCanvas, 0, 450, 350, 100);
 
     // Auto Compress JPEG to be strictly under 28-29 KB
     const compressedDataUrl = getCompressedJpegDataUrl(finalCanvas, 28);
     const finalKB = getByteSizeKB(compressedDataUrl);
 
     finalImage.src = compressedDataUrl;
-    fileSizeBadge.innerText = `Size: ${finalKB} KB (< 29 KB)`;
+    fileSizeBadge.innerText = `Size: ${finalKB} KB (< 29 KB) | Dim: 3.5cm x 5.5cm`;
     fileSizeBadge.className = finalKB < 29 ? "badge bg-success mb-2 px-3 py-1 fs-6" : "badge bg-danger mb-2 px-3 py-1 fs-6";
 
     resultContainer.style.display = 'block';
@@ -493,7 +486,7 @@
     .then(data => {
       if (data.status === "success") {
         statusMsg.style.color = "#198754";
-        statusMsg.innerText = `✅ Uploaded ${data.fileName} (${data.sizeKB} KB) to Drive.`;
+        statusMsg.innerText = "✅ Uploaded " + data.fileName + " (" + data.sizeKB + " KB) to Drive.";
         
         let currentVal = parseInt(rollInput.value);
         if (!isNaN(currentVal)) rollInput.value = currentVal + 1;
