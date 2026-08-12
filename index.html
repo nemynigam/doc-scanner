@@ -104,7 +104,7 @@
     <!-- Header -->
     <div class="app-header">
       <h5 class="m-0 fw-bold"><span class="material-icons align-middle me-1">assignment_ind</span> Doc Scanner Pro</h5>
-      <small class="opacity-75">Full Camera + Sub-Folder Drive Upload</small>
+      <small class="opacity-75">Raw Capture + Sub-Folder Drive Upload</small>
     </div>
 
     <div class="p-3 p-sm-4">
@@ -293,7 +293,7 @@
     if (!cropper) return;
 
     if (currentStep === "photo") {
-      // Get Passport Photo Crop (Color)
+      // Get Passport Photo Crop (Raw Color)
       photoDataCanvas = cropper.getCroppedCanvas({
         width: 350,
         height: 450
@@ -314,14 +314,11 @@
       stepBadge.className = "badge bg-info text-dark px-3 py-2 fs-6 rounded-pill";
 
     } else if (currentStep === "sign") {
-      // Get Freestyle Signature Crop & Auto-scale to 350x100
-      let rawSignCanvas = cropper.getCroppedCanvas({
+      // Get Raw Signature Crop (No Filter Applied)
+      signDataCanvas = cropper.getCroppedCanvas({
         width: 350,
         height: 100
       });
-
-      // Apply Auto Black & White Filter
-      signDataCanvas = applyBWFilter(rawSignCanvas, 350, 100);
 
       cropper.destroy();
       cropper = null;
@@ -340,36 +337,6 @@
     cropSection.style.display = "none";
     camSection.style.display = "block";
   });
-
-  // Apply B&W Filter for Signature
-  function applyBWFilter(sourceCanvas, width, height) {
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-
-    ctx.drawImage(sourceCanvas, 0, 0, width, height);
-
-    const imgData = ctx.getImageData(0, 0, width, height);
-    const data = imgData.data;
-
-    for (let i = 0; i < data.length; i += 4) {
-      let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-      
-      if (avg > 135) { 
-        data[i] = 255;
-        data[i + 1] = 255;
-        data[i + 2] = 255;
-      } else {
-        let darkVal = avg * 0.5;
-        data[i] = darkVal;
-        data[i + 1] = darkVal;
-        data[i + 2] = darkVal;
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
-    return canvas;
-  }
 
   // Calculate Base64 String Byte Size in KB
   function getByteSizeKB(base64DataUrl) {
