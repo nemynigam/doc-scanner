@@ -53,7 +53,7 @@
     /* Native Camera Trigger Card Box */
     .cam-trigger-box {
       width: 100%;
-      min-height: 220px;
+      min-height: 200px;
       border: 3px dashed #4e54c8;
       border-radius: 12px;
       background: #f8f9fa;
@@ -104,13 +104,23 @@
     <!-- Header -->
     <div class="app-header">
       <h5 class="m-0 fw-bold"><span class="material-icons align-middle me-1">assignment_ind</span> Doc Scanner Pro</h5>
-      <small class="opacity-75">Native Camera + Auto Merge (&lt; 29 KB)</small>
+      <small class="opacity-75">Full Camera + Sub-Folder Drive Upload</small>
     </div>
 
     <div class="p-3 p-sm-4">
+      
+      <!-- Sub-Folder Name Input -->
+      <div class="mb-2">
+        <label class="form-label fw-bold text-secondary mb-1">Folder / Batch Name</label>
+        <div class="input-group">
+          <span class="input-group-text bg-light"><span class="material-icons text-primary">folder</span></span>
+          <input type="text" id="folderName" class="form-control fw-bold" placeholder="Enter Folder Name" value="Batch_1">
+        </div>
+      </div>
+
       <!-- Roll Number Entry -->
       <div class="mb-3">
-        <label class="form-label fw-bold text-secondary">Roll Number Entry</label>
+        <label class="form-label fw-bold text-secondary mb-1">Roll Number Entry</label>
         <div class="input-group">
           <span class="input-group-text bg-light"><span class="material-icons text-primary">badge</span></span>
           <input type="text" id="rollNo" class="form-control form-control-lg fw-bold" placeholder="Enter Roll No." value="1001">
@@ -212,6 +222,7 @@
   const uploadBtn = document.getElementById('uploadBtn');
   const statusMsg = document.getElementById('statusMsg');
   const rollInput = document.getElementById('rollNo');
+  const folderInput = document.getElementById('folderName');
   const camGuideText = document.getElementById('camGuideText');
   const camIconDisplay = document.getElementById('camIconDisplay');
   const cropGuideText = document.getElementById('cropGuideText');
@@ -247,10 +258,11 @@
       if (cropper) cropper.destroy();
 
       if (currentStep === "photo") {
-        stepBadge.innerText = "Step 1: Crop Passport Photo (3.5 : 4.5)";
+        stepBadge.innerText = "Step 1: Crop Passport Photo (Fixed 3.5 : 4.5 Ratio)";
         stepBadge.className = "badge bg-warning text-dark px-3 py-2 fs-6 rounded-pill";
         cropGuideText.innerText = "Passport Photo ko 3.5:4.5 ratio me adjust/crop karein:";
 
+        // Step 1: Locked Ratio for Passport Photo
         cropper = new Cropper(cropperImage, {
           aspectRatio: 350 / 450,
           viewMode: 1,
@@ -259,12 +271,13 @@
         });
 
       } else if (currentStep === "sign") {
-        stepBadge.innerText = "Step 2: Crop Signature (Horizontal Strip)";
+        stepBadge.innerText = "Step 2: Crop Signature (Freestyle Crop)";
         stepBadge.className = "badge bg-info text-dark px-3 py-2 fs-6 rounded-pill";
-        cropGuideText.innerText = "Signature area ko adjust/crop karein:";
+        cropGuideText.innerText = "Signature ko apni marzi se kisi bhi shape me Freestyle crop karein:";
 
+        // Step 2: FREESTYLE (UNLOCKED RATIO) for Signature
         cropper = new Cropper(cropperImage, {
-          aspectRatio: 350 / 100,
+          aspectRatio: NaN, // Freeform Cropping
           viewMode: 1,
           autoCropArea: 0.85,
           responsive: true
@@ -301,7 +314,7 @@
       stepBadge.className = "badge bg-info text-dark px-3 py-2 fs-6 rounded-pill";
 
     } else if (currentStep === "sign") {
-      // Get Signature Crop
+      // Get Freestyle Signature Crop & Auto-scale to 350x100
       let rawSignCanvas = cropper.getCroppedCanvas({
         width: 350,
         height: 100
@@ -435,15 +448,16 @@
   // Upload to Google Drive & Trigger SweetAlert2 Pop-up
   uploadBtn.addEventListener('click', () => {
     const rollNo = rollInput.value.trim();
+    const folderName = folderInput.value.trim() || "General";
     const imageData = finalImage.src;
 
     statusMsg.style.color = "#0d6efd";
-    statusMsg.innerText = "Uploading to Google Drive...";
+    statusMsg.innerText = "Uploading to Google Drive Sub-folder...";
     uploadBtn.disabled = true;
 
     fetch(SCRIPT_URL, {
       method: "POST",
-      body: JSON.stringify({ rollNo: rollNo, image: imageData })
+      body: JSON.stringify({ rollNo: rollNo, folderName: folderName, image: imageData })
     })
     .then(res => res.json())
     .then(data => {
@@ -453,6 +467,7 @@
       if (data.status === "success") {
         let sizeInfo = data.sizeKB ? data.sizeKB + " KB" : getByteSizeKB(imageData) + " KB";
         let uploadedFileName = rollNo + ".jpg";
+        let targetSubFolder = data.folderName || folderName;
 
         // Success Pop-up Box
         Swal.fire({
@@ -460,6 +475,7 @@
           icon: "success",
           html: `
             <div class="text-start fs-6">
+              <p class="mb-1"><b>Sub-Folder:</b> <span class="badge bg-secondary">${targetSubFolder}</span></p>
               <p class="mb-1"><b>File Name:</b> <span class="text-primary">${uploadedFileName}</span></p>
               <p class="mb-1"><b>File Size:</b> <span class="badge bg-success">${sizeInfo}</span></p>
               <p class="mb-0"><b>Status:</b> Saved in Google Drive Folder</p>
